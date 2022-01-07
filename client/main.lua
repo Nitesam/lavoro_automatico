@@ -6,6 +6,7 @@ local JobBlips                  = {}
 local peso                      = 2500000
 local tabAttivo                 = false
 local identificativo            = nil
+local minieraCaricata           = false
 
 ESX                             = nil
 
@@ -22,60 +23,57 @@ Citizen.CreateThread(function()
     PlayerData = ESX.GetPlayerData()
     
     blipProcessi()
+    Wait(500)
+    retrieveInformation()
 end)
 
 RegisterNetEvent('esx:playerLoaded')
 AddEventHandler('esx:playerLoaded', function(xPlayer)
     PlayerData = xPlayer
+    retrieveInformation()
+end)
 
+function retrieveInformation()
     while PlayerData == nil do
         Wait(10)
     end
-
-    ESX.TriggerServerCallback('automatico:ottieniIdentificativo', function(valore)
-        identificativo = nil
-        if valore ~= nil then
-            identificativo = valore
-        end
-    end)
-
-    ESX.TriggerServerCallback('automatico:checkAcquisto', function(valore)
-        if valore ~= nil then
-            possiede = valore
-            if possiede.agg5 == 1 then 
-                peso = 5000000
-            elseif possiede.agg5 == 2 then
-                peso = 7500000
-            elseif possiede.agg5 == 3 then
-                peso = 10000000
+    if not minieraCaricata then 
+        minieraCaricata = true
+        ESX.TriggerServerCallback('automatico:ottieniIdentificativo', function(valore)
+            identificativo = nil
+            if valore ~= nil then
+                identificativo = valore
             end
+        end)
 
-            local tabella = {
-                name = identificativo,
-                maxWeight = peso
-            }
-            
-            TriggerServerEvent('ns-inventario:server:registerCustomStash', tabella)
+        ESX.TriggerServerCallback('automatico:checkAcquisto', function(valore)
+            if valore ~= nil then
+                possiede = valore
+                if possiede.agg5 == 1 then 
+                    peso = 5000000
+                elseif possiede.agg5 == 2 then
+                    peso = 7500000
+                elseif possiede.agg5 == 3 then
+                    peso = 10000000
+                end
 
-            local tabella2 = {
-                name = "miniera_"..identificativo,
-                maxWeight = (peso * 0.15)
-            }
+                attivaMagazzino()
 
-            TriggerServerEvent('ns-inventario:server:registerCustomStash', tabella2)
+                Wait(10000)
 
-            attivaMagazzino()
+                if possiede.premium == 1 then
+                    TriggerEvent("esx:showNotification", 'Dog Pillar continua a scavare per te!')
+                else
+                    TriggerEvent("esx:showNotification", 'Dog Pillar ha ripreso a scavare per te!')
+                end
 
-            if possiede.premium == 1 then
-                exports['mythic_notify']:SendAlert('success', 'Dog Pillar continua a scavare per te!')
+                TriggerEvent("menuGenerale:menuAutomatico", true)
             else
-                exports['mythic_notify']:SendAlert('success', 'Dog Pillar ha ripreso a scavare per te!')
+                possiede = {attivo = false}
             end
-        else
-            possiede = {attivo = false}
-        end
-    end)
-end)
+        end)
+    end
+end
 
 RegisterNetEvent('esx:onPlayerLogout')
 AddEventHandler('esx:onPlayerLogout', function(source,callback)
@@ -119,6 +117,7 @@ Citizen.CreateThread(function()
                     if IsControlJustReleased(1, 51) then
                         tabAttivo = true 
                         REQUEST_NUI_FOCUS(tabAttivo, possiede)
+                        disabilitaComandi()
                     end
                 end
             end
@@ -165,141 +164,17 @@ function apriMenu()
 
         if data.current.value == 'magazzino' then
             ESX.UI.Menu.CloseAll()
-            TriggerEvent('ns-inventario:client:openCustomStash', identificativo)
+            TriggerEvent("inventario:apriDeposito", "deposito_miniera", "Deposito Miniera", "raccolta_miniera_"..identificativo, peso)
         end
 
         if data.current.value == 'attrezzatura' then
-            gestioneAttrezzatura()
-        end
-        
-    end, function(data, menu)
-        menu.close()
-    end)
-end
-
-function gestioneAttrezzatura()
-    local elements = {
-        {label = 'Aggiungi Attrezzatura', value = 'aggiungi'},
-        {label = 'Rimuovi Attrezzatura', value = 'rimuovi'}
-    }
-
-    ESX.UI.Menu.CloseAll()
-    ESX.UI.Menu.Open('default', GetCurrentResourceName(), 'vault_attrezzatura', {
-        title    = 'Attrezzatura',
-        align    = 'top-left',
-        elements = elements,
-    }, function(data, menu)
-
-        if data.current.value == 'aggiungi' then
-            aggiungiOggetto()
-        end
-
-        if data.current.value == 'rimuovi' then
-            rimuoviOggetto()
-        end
-        
-    end, function(data, menu)
-        menu.close()
-    end)
-end
-
-function aggiungiOggetto()
-    ESX.TriggerServerCallback('ns_locali:ottieniInventario', function(inventory)
-
-    local elements = {}
-    
-    for i=1, #inventory.items, 1 do
-        local item = inventory.items[i]
-    
-        if item.count > 0 then
-        	table.insert(elements, {label = item.label .. ' x' .. item.count, type = 'item_standard', value = item.name})
-        end
-    end
-    
-    ESX.UI.Menu.Open('default', GetCurrentResourceName(), 'vault_attrezzatura_aggiungi', {
-        title    = 'Deposito',
-        elements = elements
-        }, function(data, menu)
-    
-        local nomeOggetto = data.current.value
-    
-        ESX.UI.Menu.Open('dialog', GetCurrentResourceName(), 'vault_attrezzatura_aggiungi_qty', {
-            title = 'Quantità'
-            }, function(data2, menu2)
-    
-            local amount = tonumber(data2.value)
-    
-            if amount == nil then
-                ESX.ShowNotification2('Quantità non ~r~Valida')
-            else
-                menu2.close()
-                menu.close()
-
-                TriggerServerEvent('lavoro_automatico:inserisciAttrezzatura', nomeOggetto, amount, "miniera_"..identificativo)
-
-                Wait(250)
-    
-                aggiungiOggetto()
-            end
-            
-            end, function(data2, menu2)
-            menu2.close()
-            end)
-        end, function(data, menu)
-        menu.close()
-        end)
-    end)
-end
-
-function rimuoviOggetto()
-    
-    ESX.TriggerServerCallback('lavoro_automatico:OttieniAttrezzatura', function(risultato)
-        if risultato ~= nil then
-            local elements = {}
-            
-            for k,v in pairs(risultato.inventario) do
-                if v.count > 0 then
-                    table.insert(elements, {label = v.label .. ' x' .. v.count, type = 'item_standard', value = v.name})
-                end
-            end
-            
             ESX.UI.Menu.CloseAll()
-    
-            ESX.UI.Menu.Open('default', GetCurrentResourceName(), 'vault_attrezzatura_rimuovi', {
-                title    = 'Deposito Attrezzi',
-                align    = 'top-left',
-                elements = elements,
-            }, function(data, menu)
-
-                local nomeOggetto = data.current.value
-            
-                ESX.UI.Menu.Open('dialog', GetCurrentResourceName(), 'vault_attrezzatura_aggiungi_qty', {
-                    title = 'Quantità'
-                    }, function(data2, menu2)
-            
-                    local amount = tonumber(data2.value)
-            
-                    if amount == nil then
-                        ESX.ShowNotification2('Quantità non ~r~Valida')
-                    else
-                        menu2.close()
-                        menu.close()
-
-                        TriggerServerEvent('lavoro_automatico:ritiraAttrezzatura', nomeOggetto, amount, "miniera_"..identificativo)
-
-                        Wait(500)
-            
-                        rimuoviOggetto()
-                    end
-                    
-                    end, function(data2, menu2)
-                    menu2.close()
-                    end)
-                end, function(data, menu)
-                menu.close()
-            end)
+            TriggerEvent("inventario:apriDeposito", "deposito_miniera", "Deposito Attrezzatura", "miniera_"..identificativo, (peso * 0.15))
         end
-    end, "miniera_"..identificativo)
+        
+    end, function(data, menu)
+        menu.close()
+    end)
 end
 
 -- GESTIONE NPC
@@ -387,24 +262,10 @@ RegisterNUICallback(
             if valore then
                 ChiudiUI()
 
-                local tabella = {
-                    name = identificativo,
-                    maxWeight = 2500
-                }
-
-                TriggerServerEvent('ns-inventario:server:registerCustomStash', tabella)
-
-                local tabella2 = {
-                    name = "miniera_"..identificativo,
-                    maxWeight = (2500 * 0.15)
-                }
-
-                TriggerServerEvent('ns-inventario:server:registerCustomStash', tabella2)
-
                 attivaMagazzino()
-
+                TriggerEvent("menuGenerale:menuAutomatico", true)
             else
-                TriggerEvent('esx:showAdvancedNotification', "~h~~y~Dog Pillar~w~", "~o~Dipendente", "Non hai abbastanza ~r~denaro~s~ per acquistare una ~g~Miniera.", "CHAR_MULTIPLAYER", 2)
+                TriggerEvent('esx:showNotification', "Non hai abbastanza denaro per Acquistare una Miniera.", "error", 5000, "Dog Pillar")
             end
         end)
     end
@@ -414,7 +275,7 @@ RegisterNUICallback("AcquistoAggiornamento", function(data)
     ESX.TriggerServerCallback('automatico:acquistaAggiornamenti', function(risultato)
         if risultato then
             ChiudiUI()
-            ESX.ShowNotification2("La ~y~transazione~w~ è andata a buon fine, ~g~aggiornamento~w~ installato!")
+            ESX.ShowNotification("La transazione è andata a buon fine, Aggiornamento Installato!", "success")
 
             if possiede.agg5 == 1 then 
                 peso = 5000000
@@ -424,22 +285,8 @@ RegisterNUICallback("AcquistoAggiornamento", function(data)
                 peso = 10000000
             end
 
-            local tabella = {
-                name = identificativo,
-                maxWeight = peso
-            }
-
-            TriggerServerEvent('ns-inventario:server:registerCustomStash', tabella)
-
-            local tabella2 = {
-                name = "miniera_"..identificativo,
-                maxWeight = (peso * 0.15)
-            }
-
-            TriggerServerEvent('ns-inventario:server:registerCustomStash', tabella2)
-
         else
-            TriggerEvent('esx:showAdvancedNotification', "~h~~y~Dog Pillar~w~", "~o~Dipendente", "Hai bisogno di più ~r~denaro~s~ per acquistare questo ~g~Aggiornamento~s~.", "CHAR_MULTIPLAYER", 2)
+            TriggerEvent('esx:showNotification', "Hai bisogno di più denaro per acquistare questo Aggiornamento.", "error", 5000, "Dog Pillar")
         end
     end, data.valore, data.denaro, data.livello) 
 end)
@@ -472,9 +319,9 @@ function ChiudiUI()
     tabAttivo = false
 end
 
-Citizen.CreateThread(function()
-    while true do
-        if (tabAttivo) then
+function disabilitaComandi()
+    Citizen.CreateThread(function()
+        while tabAttivo do
             local ped = PlayerPedId()
             DisableControlAction(0, 1, true) -- LookLeftRight
             DisableControlAction(0, 2, true) -- LookUpDown
@@ -482,9 +329,7 @@ Citizen.CreateThread(function()
             DisablePlayerFiring(ped, true) -- Disable weapon firing
             DisableControlAction(0, 142, true) -- MeleeAttackAlternate
             DisableControlAction(0, 106, true) -- VehicleMouseControlOverride
-        else 
-            Citizen.Wait(500)
+            Citizen.Wait(2)
         end
-        Citizen.Wait(2)
-    end
-end)
+    end)
+end

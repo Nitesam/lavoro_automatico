@@ -2,56 +2,49 @@ ESX               = nil
 local giocatori = {}
 local farmOggetti = {
 	[0] = {
-		AttrezziNecessari = 1,
 		Strumenti = {
 			["piccone_di_ferro"] = {
 				label = "Piccone di Ferro",
-				qty = 5,
-				pesoItem = 5000
+				qty = 5
 			}
 		},
 		Minerali =  {
 			["marna_da_cemento"] = {
 				label = "Marna da Cemento",
-				farm = 60,
+				farm = 75,
 				pesoItem = 2500
 			}
 		}
 	},
 	[1] = {
-		AttrezziNecessari = 1,
 		Strumenti = {
 			["piccone_di_ferro"] = {
 				label = "Piccone di Ferro",
-				qty = 7,
-				pesoItem = 5000
+				qty = 7
 			}
 		},
 		Minerali =  {
 			["marna_da_cemento"] = {
 				label = "Marna da Cemento",
-				farm = 36,
+				farm = 40,
 				pesoItem = 2500
 			},
 			["carbone"] = {
 				label = "Carbone",
-				farm = 24,
+				farm = 30,
 				pesoItem = 2500
 			}
 		}
 	},
 	[2] = {
-		AttrezziNecessari = 2,
 		Strumenti = {
 			["piccone_di_ferro"] = {
 				label = "Piccone di Ferro",
-				qty = 20,
-				pesoItem = 5000
+				qty = 20
 			},
 			["lampade"] = {
 				label = "Lampade",
-				qty = 5,
-				pesoItem = 1500
+				qty = 5
 			}
 		},
 		Minerali =  {
@@ -73,22 +66,18 @@ local farmOggetti = {
 		}
 	},
 	[3] = {
-		AttrezziNecessari = 3,
 		Strumenti = {
 			["piccone_di_ferro"] = {
 				label = "Piccone di Ferro",
-				qty = 30,
-				pesoItem = 5000
+				qty = 30
 			},
 			["carretto_di_ferro"] = {
 				label = "Carretto di Ferro",
-				qty = 3,
-				pesoItem = 50000
+				qty = 3
 			},
 			["lampade"] = {
 				label = "Lampade",
-				qty = 10,
-				pesoItem = 1500
+				qty = 10
 			}
 		},
 		Minerali =  {
@@ -110,27 +99,22 @@ local farmOggetti = {
 		}
 	},
 	[4] = {
-		AttrezziNecessari = 4,
 		Strumenti = {
 			["attrezzatura_da_scavi"] = {
 				label = "Attrezzatura da Scavi",
-				qty = 10,
-				pesoItem = 10000
+				qty = 10
 			},
 			["carretto_di_ferro"] = {
 				label = "Carretto di Ferro",
-				qty = 2,
-				pesoItem = 50000
+				qty = 2
 			},
 			["lampadine"] = {
 				label = "Lampadine",
-				qty = 5,
-				pesoItem = 500
+				qty = 5
 			},
 			["benzina_industriale"] ={
 				label = "Benzina Industriale",
-				qty = 10,
-				pesoItem = 5000
+				qty = 10
 			}
 		},
 		Minerali =  {
@@ -157,22 +141,22 @@ local farmOggetti = {
 		}
 	},
 	[5] = {
-		AttrezziNecessari = 3,
 		Strumenti = {
 			["attrezzatura_da_scavi"] = {
 				label = "Attrezzatura da Scavi",
-				qty = 40,
-				pesoItem = 10000
+				qty = 40
 			},
 			["cavi_industriali"] = {
 				label = "Cavi Industriali",
-				qty = 15,
-				pesoItem = 5000
+				qty = 15
+			},
+			["carretto_di_ferro"] = {
+				label = "Carretto di Ferro",
+				qty = 5
 			},
 			["benzina_industriale"] ={
 				label = "Benzina Industriale",
-				qty = 35,
-				pesoItem = 5000
+				qty = 30
 			}
 		},
 		Minerali =  {
@@ -243,7 +227,7 @@ MySQL.ready(function()
 				print("\n----------------\n\n")
 				
 
-				giocatori[steamid] = {
+				giocatori[v.identifier] = {
 					identificatore = v.identifier,
 					agg1 = v.agg1,
 					agg2 = v.agg2,
@@ -253,167 +237,335 @@ MySQL.ready(function()
 					storage = v.agg5,
 					premium = v.premium
 				}
+
+				threadGiocatore(v.identifier)
 			end
 		end
 	end)
 end)
 
-local TempoAttesa = (15 * 60) * 1000
+local ThreadAttivi = 0
 
-Citizen.CreateThread(function()
-	while true do
-		Citizen.Wait(TempoAttesa)
-		print('\n--------------\n')
-		for k,v in pairs(giocatori) do
-			Citizen.Wait(100)
-			daiOggettiGiocatore(k, v.livello, v.storage)
-			print(v.identificatore .. " servito.")
-		end
-		print('\n['.. os.date("%H:%M") .. '] '..'- [Dog Pillar] Consegne Completate.')
-		print('\n--------------\n')
-	end
-end)
+function threadGiocatore(_k)
+	local k = _k
+	local TempoAttesa = (15 * 60) * 1000
+	local TempoIniziale = TempoAttesa
 
-function daiOggettiGiocatore(identificatoreGiocatore, minieraLV, storage)
-	local invtable = {}
+	ThreadAttivi = ThreadAttivi + 1
 
-	MySQL.Async.fetchAll('SELECT * FROM nitesam_customstashs WHERE stashname = @stashname', {['@stashname'] = identificatoreGiocatore}, function(stash)
-		if stash[1] ~= nil then
-			invtable = json.decode(stash[1].data)
+	print("[Dog Pillar] - Thread Numero [".. ThreadAttivi .."] per [" .. k .. "] Attivato.")
 
-			local totalweight = 0
-			local testoGiocatore = nil
+	Citizen.CreateThread(function()
+		while true do
+			local Avvisi = {
+				[1] = false, 
+				[2] = false
+			}
 
-			for i=1, #invtable, 1 do
-				if invtable[i].weight ~= nil and invtable[i].type == 'item_standard' then
-					totalweight = totalweight + (invtable[i].weight * invtable[i].count)
+			while TempoAttesa > 0 do 
+				Citizen.Wait(10000)
+				TempoAttesa = TempoAttesa - 10000
+
+				if TempoAttesa <= (TempoIniziale * 0.75) and not Avvisi[1] then
+					Avvisi[1] = true
+					AvvisoAttrezzi()
 				end
-			end
-
-			if ESX.GetPlayerFromIdentifier(identificatoreGiocatore) ~= nil then
-				testoGiocatore = ESX.GetPlayerFromIdentifier(identificatoreGiocatore)
-			end
-			
-			for k,v in pairs(farmOggetti[minieraLV].Minerali) do
-				local count = v.farm
-				local presente = nil
-				local peso = 2500000
-
-				if storage == 1 then
-					peso = 5000000
-				elseif storage == 2 then
-					peso = 7500000
-				elseif storage == 3 then
-					peso = 10000000
+				
+				if TempoAttesa <= (TempoIniziale * 0.5) and not Avvisi[2] then 
+					Avvisi[2] = true
+					AvvisoAttrezzi()
 				end
 
-				if peso < totalweight + (v.pesoItem * count) then
-					local qtyCompensato = ((totalweight + (v.pesoItem * count)) - peso)
-					count = count - qtyCompensato
-					if count > 0 then
-						print(k, count)
-						local cont = 0
-						for i=1, #invtable, 1 do
-							if invtable[i].name == k then
-								presente = true
-								cont = i
-								count = count + invtable[i].count
-								break
-							end
-						end
-
-						if presente then
-							table.insert(invtable, cont, {name = k, label = v.label, type = 'item_standard', count = math.floor(count), weight = v.pesoItem})
-							table.remove(invtable, cont + 1)
-						else
-							table.insert(invtable, {name = k, label = v.label, type = 'item_standard', count = math.floor(count), weight = v.pesoItem})
-						end
-
-						MySQL.Async.execute('UPDATE nitesam_customstashs SET data = @data WHERE stashname = @stashname', {['@stashname'] = identificatoreGiocatore, ['@data'] = json.encode(invtable)}, function(status)
-							if status then
-							end
-						end)
-					end
-
-					if testoGiocatore ~= nil then 
-						testoGiocatore.triggerEvent('esx:showAdvancedNotification', "~h~~y~Dog Pillar~w~", "~o~Miniera", "Il tuo ~g~Deposito Minerario~s~ ha raggiunto il suo ~r~limite~s~!", "CHAR_MULTIPLAYER", 2)
-					end
-					
-					print("Limite raggiunto per " .. identificatoreGiocatore)
+				if not giocatori[k] then 
+					print("[Dog Pillar] - Thread Numero [".. ThreadAttivi .."] per [" .. k .. "] Chiuso.")
+					ThreadAttivi = ThreadAttivi - 1
 					return
 				end
+			end
 
-				local cont = 0
-				for i=1, #invtable, 1 do
-					if invtable[i].name == k then
-						presente = true
-						cont = i
-						count = count + invtable[i].count
+			print('\n--------------\n')
+			daiOggettiGiocatore(k, giocatori[k].livello, giocatori[k].storage)
+			print('\n['.. os.date("%H:%M") .. '] '..'- [Dog Pillar] ' .. k .. ' servito.')
+			print('\n--------------\n')
+			TempoAttesa = TempoIniziale
+		end
+	end)
+
+	function AvvisoAttrezzi()
+		local Giocatore =  ESX.GetPlayerFromIdentifier(k)
+		if Giocatore then
+			if Giocatore.getNotifyStatus() then
+				ottieniInventario("miniera_" .. k, function(risultato) 
+					if risultato then 
+						local puo = isAbleToMine(k, risultato, Giocatore)
+
+						if not puo then 
+							if Giocatore then
+								if Giocatore.getNotifyStatus() then
+									Giocatore.triggerEvent('esx:showNotification', "Non possiedi abbastanza attrezzi per continuare ad estrarre risorse, hai [" .. string.format("%.1f", ((TempoAttesa/(1000*60))%60)) .. "m] per rimediare!")
+								end
+							end
+						end
+					else
+						print("[Dog Pillar] - Errore nel caricamento dell'Inventario Attrezzi per il Giocatore " .. k .. "!!!")
+			
+						if Giocatore then
+							Giocatore.showNotification("Errore durante il Caricamento del tuo Deposito Attrezzi, Contatta lo Staff!")
+						end
+					end
+				end)
+			end
+		end
+	end
+end
+
+RegisterCommand("threadMiniera", function(source, args, raw)
+	if source > 0 then 
+		local Giocatore = ESX.GetPlayerFromId(source)
+
+		if Giocatore then
+			if Giocatore.controllaGrado("helper") then
+				--[[if args[1] then 
+					for i = 1, tonumber(args[1]), 1 do
+						threadGiocatore(Giocatore.getIdentifier())
+					end
+				end]]
+
+				Giocatore.showNotification("I Thread attualmente Attivi sono [" .. ThreadAttivi .. "]")
+			end
+		end
+	else
+		print("[Dog Pillar] - Thread Attualmente Attivi: " .. ThreadAttivi)
+	end
+end, true)
+
+function daiOggettiGiocatore(identificatoreGiocatore, minieraLV, storage)
+	local inventario = nil
+	local oggetti    = nil 
+	local testoGiocatore = nil
+
+	if ESX.GetPlayerFromIdentifier(identificatoreGiocatore) ~= nil then
+		testoGiocatore = ESX.GetPlayerFromIdentifier(identificatoreGiocatore)
+	end
+
+	ottieniInventario("raccolta_miniera_" .. identificatoreGiocatore, function(risultato)
+		if risultato then 
+			inventario = risultato
+		else
+			print("[Dog Pillar] - Errore nel caricamento dell'Inventario per il Giocatore " .. identificatoreGiocatore .. "!!!")
+
+			if testoGiocatore then
+				testoGiocatore.showNotification("Errore durante il Caricamento del tuo Deposito Minerali, Contatta lo Staff!")
+			end
+		end
+	end)
+
+	ottieniInventario("miniera_" .. identificatoreGiocatore, function(risultato) 
+		if risultato then 
+			oggetti = risultato
+		else
+			print("[Dog Pillar] - Errore nel caricamento dell'Inventario Attrezzi per il Giocatore " .. identificatoreGiocatore .. "!!!")
+
+			if testoGiocatore then
+				testoGiocatore.showNotification("Errore durante il Caricamento del tuo Deposito Attrezzi, Contatta lo Staff!")
+			end
+		end
+	end)
+
+	local hint = 0
+	while inventario == nil or oggetti == nil do 
+		Wait(100)
+		if hint == 10000 then
+			print("[Dog Pillar] - Errore durante il caricamento degli Inventari per il giocatore [" .. identificatoreGiocatore .. "]!")
+			testoGiocatore.showNotification("Errore durante il caricamento degli Inventari Miniera, Contatta lo Staff!")
+			return
+		else
+			hint = hint + 100
+		end
+	end
+	
+	local pesoDeposito = 0
+
+	for i=1, #inventario, 1 do 
+		if ESX.Items[inventario[i].name] ~= nil and ESX.Items[inventario[i].name].weight ~= nil and inventario[i].type == 'item_standard' then 
+			pesoDeposito = pesoDeposito + (ESX.Items[inventario[i].name].weight * inventario[i].count)
+		end
+	end
+
+	local pesoLimite = Config.PesoBase
+
+	if storage == 1 then
+		pesoLimite = pesoLimite * 2
+	elseif storage == 2 then
+		pesoLimite = pesoLimite * 3
+	elseif storage == 3 then
+		pesoLimite = pesoLimite * 4
+	end
+	
+	oggetti = isAbleToMine(identificatoreGiocatore, oggetti, testoGiocatore)
+
+	if oggetti then
+		local ArrayMessaggero = {}
+		local oggettiFarmati = 0 
+
+		for k,v in pairs(farmOggetti[minieraLV].Minerali) do 
+			local qty = v.farm
+			local pesoDepositoNuovo = pesoDeposito + (v.pesoItem * qty)
+
+			if pesoLimite >= pesoDepositoNuovo then 
+				pesoDeposito = pesoDepositoNuovo
+			else
+				qty = 0
+				for i = 1, v.farm , 1 do 
+					pesoDepositoNuovo = pesoDeposito + v.pesoItem
+
+					if pesoLimite >= pesoDepositoNuovo then
+						pesoDeposito = pesoDepositoNuovo
+						qty = i 
+					else
+						break
+					end
+				end
+			end
+			
+			if qty > 0 then 
+				oggettiFarmati = oggettiFarmati + 1 
+				table.insert(ArrayMessaggero, {
+					nomeItem = k,
+					daAggiungere = qty,
+					testo = "Depositati <span style='color:#ff00ff'>[" .. qty .. "x]</span>  di <span style='color:#00ff00'>[" .. v.label .. "]</span> nel tuo Deposito Minerario.",
+					testoDiscord = "**[" .. v.label .. "]** - Inserite " .. "**[" .. qty .. "]** unità."
+				})
+			else
+				table.insert(ArrayMessaggero, {
+					nomeItem = nil,
+					daAggiungere = nil,
+					testo = "Non è stato possibile depositare <span style='color:#9400D3'>[" .. v.label .. "]</span>, spazio non sufficiente.",
+					testoDiscord = "**[".. v.label .."]** - **Impossibile** depositare **nuove unità**."
+				})
+			end
+		end
+		
+		
+		local discordMessage = {}
+		for i = 1, #ArrayMessaggero, 1 do 
+			if ArrayMessaggero[i].nomeItem ~= nil then 
+				local trovato = false
+				for j = 1, #inventario, 1 do 
+					if ArrayMessaggero[i].nomeItem == inventario[j].name then
+						inventario[j].count = inventario[j].count + ArrayMessaggero[i].daAggiungere
+						trovato = true 
 						break
 					end
 				end
 
-				if presente then
-					table.insert(invtable, cont, {name = k, label = v.label, type = 'item_standard', count = math.floor(count), weight = v.pesoItem})
-					table.remove(invtable, cont + 1)
-				else
-					table.insert(invtable, {name = k, label = v.label, type = 'item_standard', count = math.floor(count), weight = v.pesoItem})
+				if not trovato then
+					table.insert(inventario,{
+						type = "item_standard",
+						name = ArrayMessaggero[i].nomeItem,
+						count = ArrayMessaggero[i].daAggiungere
+					})
 				end
 			end
 
-			MySQL.Async.fetchAll('SELECT * FROM nitesam_customstashs WHERE stashname = @stashname', {['@stashname'] = "miniera_"..identificatoreGiocatore}, function(stash2)
-				if stash2[1] ~= nil then
-					local invtable2 = json.decode(stash2[1].data)
-					local cont = 0
-
-					for k,v in pairs(farmOggetti[minieraLV].Strumenti) do
-						local hint = false
-
-						for i=1, #invtable2, 1 do
-							if invtable2[i].name == k then
-								if invtable2[i].count >= v.qty then
-									local contatore = invtable2[i].count - (math.ceil(v.qty/4))
-									table.insert(invtable2, i, {name = k, label = v.label, type = 'item_standard', count = math.floor(contatore), weight = (v.pesoItem * contatore)})
-									table.remove(invtable2, i + 1)
-									cont = cont + 1
-								else
-									if testoGiocatore then 
-										testoGiocatore.triggerEvent('esx:showAdvancedNotification', "~h~~y~Dog Pillar~w~", "~o~Miniera", "Non è possibile prelevare dalla tua ~g~Miniera~s~ poichè la quantità di ~r~".. v.label .."~s~ non è sufficiente!", "CHAR_BLOCKED", 2)
-									end
-								end
-								hint = true
-								break
-							end
-						end
-
-						if not hint then
-							testoGiocatore.triggerEvent('esx:showAdvancedNotification', "~h~~y~Dog Pillar~w~", "~o~Miniera", "Non è possibile prelevare dalla tua ~g~Miniera~s~ poichè la quantità di ~r~".. v.label .."~s~ non è sufficiente!", "CHAR_BLOCKED", 2)
-						end
-					end
-
-					if cont < farmOggetti[minieraLV].AttrezziNecessari then
-						return
-					end
-
-					MySQL.Async.execute('UPDATE nitesam_customstashs SET data = @data WHERE stashname = @stashname', {['@stashname'] = "miniera_"..identificatoreGiocatore, ['@data'] = json.encode(invtable2)}, function(status)
-						if status then
-						end
-					end)
-
-					MySQL.Async.execute('UPDATE nitesam_customstashs SET data = @data WHERE stashname = @stashname', {['@stashname'] = identificatoreGiocatore, ['@data'] = json.encode(invtable)}, function(status)
-						if status then
-						end
-					end)
-
-					if testoGiocatore ~= nil then 
-						testoGiocatore.triggerEvent('esx:showAdvancedNotification', "~h~~y~Dog Pillar~w~", "~o~Miniera", "Dei ~o~Materiali~s~ sono stati consegnati nel tuo ~g~Deposito Minerario~s~!", "CHAR_MULTIPLAYER", 2)
-					end
-				end
-			end)
+			if ArrayMessaggero[i].testoDiscord then
+				table.insert(discordMessage, ArrayMessaggero[i].testoDiscord)
+			end
 		end
-	end)
+		
+		if oggettiFarmati > 0 then 
+			TriggerEvent("inventario:aggiornaMiniera", {identificativo = "raccolta_miniera_" .. identificatoreGiocatore, tipologia = "deposito_miniera"}, inventario)
+			TriggerEvent("inventario:aggiornaMiniera", {identificativo = "miniera_" .. identificatoreGiocatore, tipologia = "deposito_miniera"}, oggetti)
+		else
+			if testoGiocatore then 
+				Wait(2000)
+				if testoGiocatore.getNotifyStatus() then
+					testoGiocatore.triggerEvent('esx:showNotification', "Non è stato possibile estrarre risorse poichè non vi è abbastanza Spazio Disponibile!", "error", 10000, "Dog Pillar")
+				end
+			end
+		end
+
+		if testoGiocatore then
+			Wait(100)
+			TriggerClientEvent('inventario:refresh', testoGiocatore.source) -- Previene Bug Abusing
+			inviaMessaggi(ArrayMessaggero, testoGiocatore)
+			inviaEmbeded("**[".. identificatoreGiocatore .."]**", 2067276, discordMessage)
+		end
+	else
+		if testoGiocatore then 
+			Wait(2000)
+			if testoGiocatore.getNotifyStatus() then
+				testoGiocatore.triggerEvent('esx:showNotification', "Non è stato possibile estrarre risorse poichè non vi sono abbastanza Attrezzi!", "error", 10000, "Dog Pillar")
+			end
+		end
+	end
 end
 
+function inviaMessaggi(arrayMessaggi, giocatore)
+	if giocatore.getNotifyStatus() then
+		Citizen.CreateThread(function()
+			for i = 1, #arrayMessaggi, 1 do 
+				Citizen.Wait(math.random(1000,2500))
+				if giocatore then 
+					giocatore.triggerEvent('esx:showNotification', arrayMessaggi[i].testo, "info", 5000, "Dog Pillar")
+				else
+					break
+				end
+			end
+		end)
+	end
+end
+
+function ottieniInventario(deposito, callback)
+	local inventario = exports.inventario:prendiInventario(deposito, "deposito_miniera")
+	callback(inventario)
+end
+
+function isAbleToMine(identifica, _inventario, _testoGiocatore)
+	local inventario = _inventario
+	local testoGiocatore = _testoGiocatore
+
+	if giocatori[identifica] then
+		local hint = 0
+
+		for k,v in pairs(farmOggetti[giocatori[identifica].livello].Strumenti) do 
+			local trovato = {
+				presente = false,
+				differenza = 0
+			}
+
+			for i = 1, #inventario, 1 do 
+				if inventario[i].name == k then 
+					if inventario[i].count >= v.qty then 
+						inventario[i].count = inventario[i].count - v.qty
+						trovato.presente = true
+					else
+						trovato.differenza = v.qty - inventario[i].count
+					end
+
+					break
+				end
+			end
+
+			if not trovato.presente then 
+				if testoGiocatore then 
+					if testoGiocatore.getNotifyStatus() then 
+						if trovato.differenza == 0 then trovato.differenza = v.qty end
+						testoGiocatore.triggerEvent('esx:showNotification', "Quantità di <span style='color:#00ff00'>".. v.label .."</span> nella tua <span style='color:#3399ff'>Miniera</span> insufficiente! <span style='color:#ff00ff'>[x".. trovato.differenza .." Mancanti!]</span>", "error", 7500, "Dog Pillar")
+						Citizen.Wait(1000)
+					end
+				end
+				hint = hint + 1
+			end
+		end
+
+		if hint > 0 then
+			return false
+		else
+			return inventario
+		end
+	end
+end
 
 ESX.RegisterServerCallback('automatico:checkAcquisto', function(source, cb)
 	local xPlayer = ESX.GetPlayerFromId(source)
@@ -461,6 +613,8 @@ ESX.RegisterServerCallback('automatico:checkAcquisto', function(source, cb)
 					storage = risultato[1].agg5,
 					premium = risultato[1].premium
 				}
+				
+				threadGiocatore(steamid)
 
 				cb({
 					attivo = true,
@@ -550,7 +704,7 @@ function acquistoTrivella(valore, source)
 				["@identifier"] = steamid
 			}, function(result)
 				if result then
-					TriggerClientEvent('esx:showAdvancedNotification', source, "~h~~y~Dog Pillar~w~", "~o~Miniera", '~g~Salve!~s~ Noi di Dog Pillar depositeremo ogni ~r~15 minuti~s~ le risorse ricavate nel ~g~tuo magazzino~s~!', "CHAR_MULTIPLAYER", 2)
+					TriggerClientEvent('esx:showNotification', source, 'Salve! Noi di Dog Pillar depositeremo ogni 15 minuti le risorse ricavate nel tuo magazzino!', "success", 6000, "Dog Pillar")
 					
 					giocatori[steamid] = {
 						identificatore = steamid,
@@ -562,6 +716,8 @@ function acquistoTrivella(valore, source)
 						storage = 0,
 						premium = 0
 					}
+
+					threadGiocatore(steamid)
 
 					TriggerClientEvent('automatico:aggiornaPossiedi', source, {
 						attivo = true,
@@ -672,162 +828,6 @@ function acquistoAggiornamento(steam, source, aggiornamento, livello)
 	end)
 end
 
-ESX.RegisterServerCallback('lavoro_automatico:OttieniAttrezzatura', function(source, cb, name)
-	local src = source
-	local xPlayer = ESX.GetPlayerFromId(source)
-
-	MySQL.Async.fetchAll('SELECT * FROM nitesam_customstashs WHERE stashname = @stashname', {['@stashname'] = name}, function(stash)
-		if stash[1] ~= nil then
-			local invtable = json.decode(stash[1].data)
-
-			local weight1 = 2500000 * 0.15
-			if giocatori[xPlayer.getIdentifier()].agg5 == 1 then
-				weight1 = 5000000 * 0.15
-			elseif giocatori[xPlayer.getIdentifier()].agg5 == 2 then
-				weight1 = 7500000 * 0.15
-			elseif giocatori[xPlayer.getIdentifier()].agg5 == 3 then
-				weight1 = 10000000 * 0.15
-			end
-
-			cb({inventario = invtable, peso = peso})
-		else
-			MySQL.Async.execute('INSERT INTO nitesam_customstashs (stashname, data) VALUES (@stashname, @data)', {['@stashname'] = name, ['@data'] = '[]'})
-			cb(nil, nil)
-		end
-	end)
-end)
-
-RegisterServerEvent('lavoro_automatico:inserisciAttrezzatura')
-AddEventHandler('lavoro_automatico:inserisciAttrezzatura', function(oggetto, count, stashname)
-	local src = source
-	local xPlayer = ESX.GetPlayerFromId(src)
-	local item = xPlayer.getInventoryItem(oggetto)
-	local invtable = {}
-	
-	if count < 0 then
-		return
-	end
-	
-	local removecount = count
-
-	MySQL.Async.fetchAll('SELECT * FROM nitesam_customstashs WHERE stashname = @stashname', {['@stashname'] = stashname}, function(stash)
-		if stash[1] ~= nil then
-			invtable = json.decode(stash[1].data)
-
-			local totalweight = 0
-			local PesoAttuale = (2500000 * 0.15)
-
-			if giocatori[xPlayer.getIdentifier()].agg5 == 1 then
-				PesoAttuale = (5000000 * 0.15)
-			elseif giocatori[xPlayer.getIdentifier()].agg5 == 2 then
-				PesoAttuale = (7500000 * 0.15)
-			elseif giocatori[xPlayer.getIdentifier()].agg5 == 3 then
-				PesoAttuale = (10000000 * 0.15)
-			end
-
-			for i=1, #invtable, 1 do
-				if invtable[i].weight ~= nil and invtable[i].type == 'item_standard' then
-					totalweight = totalweight + (invtable[i].weight * invtable[i].count)
-				end
-			end
-
-
-			if PesoAttuale < totalweight + (item.weight * count) then
-				TriggerClientEvent('esx:showAdvancedNotification', src, "~h~~y~Dog Pillar~s~", "~o~Miniera", '~r~Limite~s~ Magazzino Raggiunto!', "CHAR_MULTIPLAYER", 2)
-				return
-			end
-
-
-			for i=1, #invtable, 1 do
-				if invtable[i].name == item.name then
-					count = count + invtable[i].count
-
-
-					
-					if item.count >= removecount then
-						xPlayer.removeInventoryItem(item.name, removecount)
-						if Config.UseWeight then
-							table.insert(invtable, i, {name = item.name, label = item.label, type = 'item_standard', count = count, weight = item.weight})
-						else
-							table.insert(invtable, i, {name = item.name, label = item.label, type = 'item_standard', count = count})
-						end
-					else
-						if Config.UseWeight then
-							table.insert(invtable, i, {name = item.name, label = item.label, type = 'item_standard', count = invtable[i].count, weight = item.weight})
-						else
-							table.insert(invtable, i, {name = item.name, label = item.label, type = 'item_standard', count = invtable[i].count})
-						end
-					end
-
-
-					table.remove(invtable, i + 1)
-					MySQL.Async.execute('UPDATE nitesam_customstashs SET data = @data WHERE stashname = @stashname', {['@stashname'] = stashname, ['@data'] = json.encode(invtable)}, function(status)
-						if status then
-						end
-					end)
-
-					return
-				end
-			end
-
-			if item.count >= removecount then
-				xPlayer.removeInventoryItem(item.name, removecount)
-				table.insert(invtable, {name = item.name, label = item.label, type = 'item_standard', count = count, weight = item.weight})
-			end
-
-
-			MySQL.Async.execute('UPDATE nitesam_customstashs SET data = @data WHERE stashname = @stashname', {['@stashname'] = stashname, ['@data'] = json.encode(invtable)}, function(status)
-				if status then
-				end
-			end)
-		else
-
-		end
-	end)
-end)
-
-RegisterServerEvent('lavoro_automatico:ritiraAttrezzatura')
-AddEventHandler('lavoro_automatico:ritiraAttrezzatura', function(oggetto, count, stashname)
-	local src = source
-	local xPlayer = ESX.GetPlayerFromId(src)
-	local item = xPlayer.getInventoryItem(oggetto)
-	local invtable = {}
-
-	if count < 0 then
-		return
-	end
-
-	if not xPlayer.canCarryItem(item.name, count) or not xPlayer.verificaLimite(item.name, count) then
-		TriggerClientEvent('esx:showNotification2', src, 'Non hai ~g~abbastanza spazio~w~ nell\'~r~inventario!')
-		return
-	end
-
-	MySQL.Async.fetchAll('SELECT * FROM nitesam_customstashs WHERE stashname = @stashname', {['@stashname'] = stashname}, function(stash)
-		if stash[1] ~= nil then
-			invtable = json.decode(stash[1].data)
-			for i=1, #invtable, 1 do
-				if invtable[i].name == item.name then
-					if count <= invtable[i].count then
-						xPlayer.addInventoryItem(item.name, count)
-						if invtable[i].count - count > 0 then
-							table.insert(invtable, i, {name = item.name, label = item.label, type = 'item_standard', count = invtable[i].count - count, weight = item.weight})
-							table.remove(invtable, i + 1)
-						else
-							table.remove(invtable, i)
-						end
-						MySQL.Async.execute('UPDATE nitesam_customstashs SET data = @data WHERE stashname = @stashname', {['@stashname'] = stashname, ['@data'] = json.encode(invtable)}, function(status)
-							if status then
-
-							end
-						end)
-					end
-					return
-				end
-			end		
-		end
-	end)
-end)
-
 AddEventHandler('esx:playerLogout', function(source,callback)
 	local xPlayer = ESX.GetPlayerFromId(source)
 	local identifier = xPlayer.getIdentifier()
@@ -863,3 +863,72 @@ AddEventHandler('playerDropped', function(reason)
 		end
 	end
 end)
+
+RegisterCommand("printUtentiMiniera", function(source, raw, args)
+	print(ESX.DumpTable(giocatori))
+end, true)
+
+RegisterCommand("tickMiniera", function(source, args, raw)
+	if source > 0 then 
+		local xPlayer = ESX.GetPlayerFromId(source)
+		if xPlayer.controllaGrado("admin") then
+			if args[1] then 
+				if GetPlayerName(tonumber(args[1])) then 
+					local xTarget = ESX.GetPlayerFromId(tonumber(args[1]))
+					local steamid = xTarget.getIdentifier()
+
+					if giocatori[steamid] then 
+						daiOggettiGiocatore(steamid, giocatori[steamid].livello, giocatori[steamid].storage)
+						xTarget.showNotification("Tick Miniera")
+					else
+						xTarget.showNotification("Non possiedi una Miniera")
+					end
+				else
+					xPlayer.showNotification("Giocatore non Trovato!")
+				end
+			else
+				local steamid = xPlayer.getIdentifier()
+
+				if giocatori[steamid] then 
+					daiOggettiGiocatore(steamid, giocatori[steamid].livello, giocatori[steamid].storage)
+					xPlayer.showNotification("Tick Miniera")
+				else
+					xPlayer.showNotification("Non possiedi una Miniera")
+				end
+			end
+		end
+	else
+		if args[1] then 
+			local xTarget = ESX.GetPlayerFromId(tonumber(args[1]))
+			local steamid = xTarget.getIdentifier()
+
+			if giocatori[steamid] then 
+				daiOggettiGiocatore(steamid, giocatori[steamid].livello, giocatori[steamid].storage)
+				xTarget.showNotification("Tick Miniera")
+			else
+				xTarget.showNotification("Non possiedi una Miniera")
+			end
+		end
+	end
+end, true)
+
+function inviaEmbeded(nome, color, messaggio)
+	local descrizione = ""
+
+	for i = 1, #messaggio, 1 do
+		descrizione = descrizione .. "\n" .. messaggio[i]
+	end
+
+	local tabella = {
+		{
+			["color"] = color,
+			["title"] = "Tick Miniera " .. nome,
+			["description"] = descrizione,
+			["footer"] = {
+				["text"] = "SGG Log | " .. os.date("%d/%m/%Y - %X"),
+			},
+		}
+	}
+
+	PerformHttpRequest(Config.DiscordChannel, function(err, text, headers) end, 'POST', json.encode({username = "Dog Pillar", embeds = tabella, avatar_url = DISCORD_IMAGE}), { ['Content-Type'] = 'application/json' })
+end
