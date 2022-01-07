@@ -1,30 +1,33 @@
 Config = {}
 Config.Locale = 'en'
 
+Config.PesoBase = 2500000
+Config.DiscordChannel = "https://discord.com/api/webhooks/878307248810655784/0wyB5KFfkEq-cS5ssd9A8JBzarieZXeght_EysEoFC24iIq-m1XFWItB53D3zDCXnNXa"
+
 Config.Posti = {
 	Tablet = {
-		Blip = { x = 1203.54, y = -3257.2, z = 6.07, nome = "Vendita Società"},
-		Tipologia = { Sprite = 615, Display = 4, Scale = 1.0, Colour = 60}
+		Blip = { x = 760.91, y = -1766.95, z = 29.43, nome = "Vendita Miniera"},
+		Tipologia = { Sprite = 500, Display = 4, Scale = 0.8, Colour = 2}
 	},
 	Magazzino = {
-		Blip = { x = 1198.22, y = -3291.11, z = 5.5, nome = "Magazzino Società"},
-		Tipologia = { Sprite = 616, Display = 4, Scale = 0.8, Colour = 2}
+		Blip = { x = 788.23, y = -1786.32, z = 30.87, nome = "Magazzino Miniera"},
+		Tipologia = { Sprite = 618, Display = 4, Scale = 0.8, Colour = 66}
 	}
 }
 
 Config.Ped = {
 	{
 		valore = "a_m_y_business_03",
-		x = 1196.1, 
-		y = -3295.76,
-		z = 4.5,
-		heading = 315.33
+		x = 760.91, 
+		y = -1766.95, 
+		z = 29.43,
+		heading = 264.69
 	},
 	{
 		valore = "a_m_y_business_03",
-		x = 1203.54, 
-		y = -3257.2,
-		z = 6.07,
-		heading = 3.86
+		x = 786.19, 
+		y = -1783.21, 
+		z = 29.87,
+		heading = 222.46
 	}
 }
